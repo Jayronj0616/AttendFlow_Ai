@@ -215,13 +215,23 @@ agent call requires no change to the contract or to anything downstream.
 
 ## Attendance
 
-- [ ] Missing clock-out
-- [ ] Missing clock-in
-- [ ] Existing clock-out
-- [ ] Invalid correction
-- [ ] Overtime correction
-- [ ] Multiple corrections
-- [ ] Locked payroll period
+- [x] Missing clock-out
+- [x] Missing clock-in
+- [x] Existing clock-out
+- [x] Invalid correction
+- [x] Overtime correction
+- [x] Multiple corrections
+- [x] Locked payroll period
+
+Covered by 22 Vitest cases in `lib/services/correction-rules.service.test.ts`, run with
+`pnpm test`. These exercise the rule engine directly rather than the full request path, so
+they verify which decision the rules produce, not that a correction reaches the database.
+
+The suite was checked against a deliberately introduced regression rather than assumed to
+work: dropping the schedule timezone from the overtime calculation fails the timezone case
+and passes everything else. That case is written so the same instant is evaluated against
+both a Manila and a New York shift, which stops it from passing by coincidence on a machine
+whose local zone already matches the schedule.
 
 ## Security
 
