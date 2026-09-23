@@ -4,7 +4,10 @@ import { Clock } from "lucide-react";
 import { SignInForm } from "@/components/auth/SignInForm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export const metadata: Metadata = { title: "Sign in" };
+export const metadata: Metadata = {
+  title: "Sign in",
+  robots: { index: false, follow: false },
+};
 
 export default function LoginPage() {
   return (

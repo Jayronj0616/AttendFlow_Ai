@@ -4,8 +4,13 @@ import { NextResponse, type NextRequest } from "next/server";
 import { publicEnv } from "@/lib/env";
 import type { Database } from "@/types/database.types";
 
-/** Paths reachable without a session. Everything else requires one. */
-const PUBLIC_PATHS = ["/login", "/auth"];
+/**
+ * Paths reachable without a session. Everything else requires one.
+ *
+ * "/" matches only exactly, since the check below appends a slash before testing prefixes;
+ * the landing page is public but nothing beneath it is public by default.
+ */
+const PUBLIC_PATHS = ["/", "/login", "/auth"];
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -49,6 +54,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // The landing page stays reachable while signed in; it swaps its call to action instead.
   if (user && pathname === "/login") {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";

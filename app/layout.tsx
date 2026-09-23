@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Poppins, Geist_Mono } from "next/font/google";
 
 import { ThemeProvider } from "@/components/layout/ThemeProvider";
+import { SITE_NAME, SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -18,13 +19,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: {
-    default: "AttendFlow AI",
-    template: "%s · AttendFlow AI",
+    default: SITE_NAME,
+    template: `%s · ${SITE_NAME}`,
   },
   description:
     "AI-assisted attendance correction with deterministic business rules, human approval, and a complete audit trail.",
-  robots: { index: false, follow: false },
+  // No global noindex. The landing page is public; the authenticated routes opt out
+  // individually in their own layouts.
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
