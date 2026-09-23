@@ -303,15 +303,49 @@ employee record and the employee view would be empty for them.
 
 # Phase 8 — Security
 
-- [ ] Review RLS
-- [ ] Review RBAC
-- [ ] Review server-side authorization
+- [x] Review RLS
+- [x] Review RBAC
+- [x] Review server-side authorization
 - [ ] Review AI tool permissions
-- [ ] Verify secrets are server-only
-- [ ] Input validation
-- [ ] AI output validation
-- [ ] Rate limiting where appropriate
-- [ ] Audit logging review
+- [x] Verify secrets are server-only
+- [x] Input validation
+- [x] AI output validation
+- [x] Rate limiting where appropriate
+- [x] Audit logging review
+
+## Phase 8 Notes
+
+**Secrets.** The production bundle was built and `.next/static` searched for the service
+role key, the database password, and the string `service_role`. None appear. The privileged
+client is additionally guarded by a `server-only` import, so a client component importing
+it fails the build rather than shipping the key.
+
+**Authorization.** Every privileged path routes its state change through the session
+client, so an RLS policy is what permits it rather than a role check in application code.
+The role checks that do exist are there to produce a clear message, not to be the control.
+Reviewing a correction is also conditional on the row still being `pending_hr`, making it
+an atomic claim.
+
+**Input validation.** Every Server Action parses its input with Zod before reaching a
+service. Two gaps were found and closed during this review: correction ids passed to the
+review actions were not checked as UUIDs, and the audit log's actor filter was taken
+straight from the query string into an enum comparison.
+
+**Rate limiting.** `analyzeCorrection` is limited to 15 requests a minute per user, applied
+before any work is done, because that is the path which will call a language model — an
+unbounded loop there is a bill as well as load. The limiter is table-backed rather than in
+process memory, since serverless instances do not share memory and a counter would reset
+constantly. It fails open on storage errors: a limiter that takes the product down when its
+own table is unreachable turns a minor outage into a total one, and what it guards is cost
+rather than data.
+
+**Audit logging.** Corrections, approvals, rejections, clarification requests, failed
+applications, and attendance rule changes are all recorded. Rule changes store the previous
+and new configuration, since a rule quietly loosening is exactly the change that needs a
+trail.
+
+**AI tool permissions** stay unchecked because the agent does not exist yet. The tool layer
+it will use is the one part of this review that cannot be done in advance.
 
 ---
 

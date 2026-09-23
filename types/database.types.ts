@@ -169,6 +169,12 @@ type AuditLogRow = {
   created_at: string;
 };
 
+type RateLimitEventRow = {
+  id: string;
+  subject: string;
+  created_at: string;
+};
+
 type NotificationRow = {
   id: string;
   user_id: string;
@@ -233,6 +239,7 @@ export type Database = {
         "actor_id" | "entity_id" | "previous_data" | "new_data" | "metadata"
       >;
       notifications: Table<NotificationRow, "is_read">;
+      rate_limit_events: Table<RateLimitEventRow>;
     };
     Views: Record<string, never>;
     Functions: {

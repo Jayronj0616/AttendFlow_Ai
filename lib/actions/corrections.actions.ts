@@ -17,6 +17,7 @@ import {
   type CorrectionEvaluation,
 } from "@/lib/services/correction-rules.service";
 import { getCurrentUser } from "@/lib/services/profile.service";
+import { checkRateLimit } from "@/lib/services/rate-limit.service";
 import { getAttendanceRuleConfig } from "@/lib/services/rules.service";
 import {
   aiExtractionSchema,
@@ -50,6 +51,16 @@ export async function analyzeCorrection(
   const parsed = analyzeCorrectionSchema.safeParse({ message });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0].message };
+  }
+
+  // Limited before any work is done. This is the path that will call a language model, so
+  // an unbounded loop here is a bill as well as load.
+  const limit = await checkRateLimit(`analyze:${user.userId}`, 15, 60);
+  if (!limit.allowed) {
+    return {
+      ok: false,
+      error: `Too many requests. Try again in ${limit.retryAfterSeconds} seconds.`,
+    };
   }
 
   const today = todayInTimezone();
