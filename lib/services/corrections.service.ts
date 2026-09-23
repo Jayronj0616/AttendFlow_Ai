@@ -20,6 +20,22 @@ export async function getCorrectionRequests(
   return data ?? [];
 }
 
+export async function getCorrectionsForDate(
+  employeeId: string,
+  date: string,
+): Promise<CorrectionRequest[]> {
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("correction_requests")
+    .select("*")
+    .eq("employee_id", employeeId)
+    .eq("requested_date", date)
+    .order("submitted_at", { ascending: false });
+
+  return data ?? [];
+}
+
 /** Corrections already applied automatically in the calendar month of `month` (YYYY-MM). */
 export async function countAutoAppliedInMonth(
   employeeId: string,

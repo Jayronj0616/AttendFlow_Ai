@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { StatusBadge } from "@/components/attendance/StatusBadge";
 import {
   Table,
@@ -29,12 +31,15 @@ export function RecentAttendanceTable({
           return (
             <li key={record.id} className="space-y-1 px-4 py-3">
               <div className="flex items-center justify-between gap-3">
-                <span className="text-sm font-medium">
+                <Link
+                  href={`/attendance/${record.attendance_date}`}
+                  className="text-sm font-medium hover:underline"
+                >
                   {formatDate(record.attendance_date)}
                   <span className="ml-1.5 text-xs font-normal text-muted-foreground">
                     {formatWeekday(record.attendance_date)}
                   </span>
-                </span>
+                </Link>
                 <StatusBadge label={display.label} tone={display.tone} />
               </div>
               <p className="text-sm tabular-nums text-muted-foreground">
@@ -63,10 +68,15 @@ export function RecentAttendanceTable({
               return (
                 <TableRow key={record.id}>
                   <TableCell className="font-medium whitespace-nowrap">
-                    {formatDate(record.attendance_date)}
-                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                      {formatWeekday(record.attendance_date)}
-                    </span>
+                    <Link
+                      href={`/attendance/${record.attendance_date}`}
+                      className="hover:underline"
+                    >
+                      {formatDate(record.attendance_date)}
+                      <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                        {formatWeekday(record.attendance_date)}
+                      </span>
+                    </Link>
                   </TableCell>
                   <TableCell className="tabular-nums whitespace-nowrap">
                     {formatTime(record.clock_in)}

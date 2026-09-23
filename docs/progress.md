@@ -159,7 +159,7 @@ is not claimed as done.
 
 - [x] Employee dashboard
 - [x] Attendance history
-- [ ] Attendance detail
+- [x] Attendance detail
 - [x] Correction request form
 - [x] Natural-language request
 - [x] Request summary
@@ -179,7 +179,10 @@ correction can actually be written and confirmed, offering a button that appears
 one would breach the rule in `docs/UI_UX.md` section 13 that an AI recommendation must
 never look like a completed action.
 
-Attendance detail remains unbuilt; the list views cover the specified employee flows.
+Attendance detail compares the recorded punches against the schedule that applied on that
+date and states the difference in plain terms, so an employee can see why a day was marked
+undertime rather than only that it was. The date segment is validated against an ISO
+pattern before it reaches a query, since it arrives from the URL.
 
 ---
 
