@@ -1,3 +1,4 @@
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 
@@ -20,9 +21,10 @@ export function TopBar({ title, description, actions }: TopBarProps) {
           </p>
         ) : null}
       </div>
-      {actions ? (
-        <div className="flex shrink-0 items-center gap-2">{actions}</div>
-      ) : null}
+      <div className="flex shrink-0 items-center gap-2">
+        <ThemeToggle />
+        {actions}
+      </div>
     </header>
   );
 }

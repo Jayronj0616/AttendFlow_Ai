@@ -1,22 +1,33 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { Loader2 } from "lucide-react";
 
 import { AiAnalysisPanel } from "@/components/corrections/AiAnalysisPanel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
   analyzeCorrection,
   type CorrectionAnalysis,
 } from "@/lib/actions/corrections.actions";
+import { AI_DECISION_DISPLAY } from "@/lib/status";
 
 export function CorrectionRequestForm() {
   const [message, setMessage] = useState("");
   const [analysis, setAnalysis] = useState<CorrectionAnalysis | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const resultRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!analysis) return;
+    // block: "nearest" moves the page only when the result is actually off screen, which
+    // matters on a phone where it lands below the fold and would otherwise go unnoticed.
+    resultRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [analysis]);
 
   function handleAnalyze() {
     startTransition(async () => {
@@ -52,6 +63,7 @@ export function CorrectionRequestForm() {
             onChange={(event) => setMessage(event.target.value)}
             placeholder="I forgot to clock out yesterday at 5:10 PM."
             rows={4}
+            disabled={isPending}
             aria-describedby={error ? "correction-error" : undefined}
             aria-invalid={error ? true : undefined}
           />
@@ -66,18 +78,38 @@ export function CorrectionRequestForm() {
           ) : null}
           <div className="flex justify-end">
             <Button onClick={handleAnalyze} disabled={isPending}>
-              {isPending
-                ? "Analysing…"
-                : analysis
-                  ? "Analyse again"
-                  : "Analyse request"}
+              {isPending ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Analysing…
+                </>
+              ) : analysis ? (
+                "Analyse again"
+              ) : (
+                "Analyse request"
+              )}
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {analysis ? (
-        <>
+      {/* Screen readers get the outcome announced; sighted users get the panel below.
+          Without this the decision arrives silently for anyone not watching the screen. */}
+      <p className="sr-only" role="status" aria-live="polite">
+        {isPending
+          ? "Analysing the request."
+          : analysis
+            ? `Analysis complete. ${AI_DECISION_DISPLAY[analysis.evaluation.decision].label}. ${analysis.evaluation.reason}`
+            : ""}
+      </p>
+
+      {isPending ? (
+        <AnalysisSkeleton />
+      ) : analysis ? (
+        <div
+          ref={resultRef}
+          className="animate-in fade-in slide-in-from-bottom-2 space-y-6 duration-300"
+        >
           <AiAnalysisPanel analysis={analysis} />
 
           <Card>
@@ -100,13 +132,37 @@ export function CorrectionRequestForm() {
               </p>
             </CardContent>
           </Card>
-        </>
+        </div>
       ) : null}
     </div>
   );
 }
 
-function submitHint(decision: CorrectionAnalysis["evaluation"]["decision"] | undefined) {
+/** Mirrors the analysis panel's shape so the result settles in place rather than jumping. */
+function AnalysisSkeleton() {
+  return (
+    <Card aria-hidden>
+      <CardHeader className="gap-3">
+        <div className="flex items-center justify-between gap-2">
+          <Skeleton className="h-5 w-20" />
+          <Skeleton className="h-6 w-36 rounded-md" />
+        </div>
+        <Skeleton className="h-4 w-4/5" />
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Skeleton className="h-10" />
+          <Skeleton className="h-10" />
+        </div>
+        <Skeleton className="h-24 rounded-md" />
+      </CardContent>
+    </Card>
+  );
+}
+
+function submitHint(
+  decision: CorrectionAnalysis["evaluation"]["decision"] | undefined,
+) {
   switch (decision) {
     case "auto_approve":
       return "This correction meets the rules for automatic processing.";

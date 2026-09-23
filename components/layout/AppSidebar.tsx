@@ -87,15 +87,23 @@ export function AppSidebar({ role, name, subtitle }: AppSidebarProps) {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg">
-              <div className="flex aspect-square size-8 items-center justify-center rounded-md bg-muted text-xs font-medium">
-                {initials(name)}
-              </div>
-              <div className="grid flex-1 text-left leading-tight">
-                <span className="truncate font-medium">{name}</span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {subtitle}
-                </span>
+            {/* Rendered as a plain element, not a button. It becomes the account menu once
+                authentication exists; until then it should not look pressable. */}
+            <SidebarMenuButton
+              size="lg"
+              asChild
+              className="cursor-default hover:bg-transparent active:bg-transparent"
+            >
+              <div>
+                <div className="flex aspect-square size-8 items-center justify-center rounded-md bg-muted text-xs font-medium">
+                  {initials(name)}
+                </div>
+                <div className="grid flex-1 text-left leading-tight">
+                  <span className="truncate font-medium">{name}</span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    {subtitle}
+                  </span>
+                </div>
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
