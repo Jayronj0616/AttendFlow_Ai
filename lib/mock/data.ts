@@ -5,11 +5,13 @@
 // Shapes match types/domain.ts exactly, so components written against these need no
 // changes when the real data arrives.
 
+import type { AttendanceRuleConfig } from "@/lib/services/correction-rules.service";
 import type {
   AttendanceRecord,
   CorrectionRequest,
   Department,
   Employee,
+  Notification,
   WorkSchedule,
 } from "@/types/domain";
 
@@ -43,6 +45,15 @@ export const mockSchedule: WorkSchedule[] = [1, 2, 3, 4, 5].map((day) => ({
   effective_from: "2026-01-01",
   effective_until: null,
 }));
+
+// Stands in for the attendance_rules table. Each key maps to one of the rule_code values
+// listed in docs/database.md.
+export const mockAttendanceRules: AttendanceRuleConfig = {
+  maximum_auto_corrections: 2,
+  overtime_threshold_minutes: 60,
+  correction_submission_deadline_days: 14,
+  locked_payroll_periods: [{ start: "2026-09-01", end: "2026-09-15" }],
+};
 
 const at = (date: string, time: string) => `${date}T${time}+08:00`;
 
@@ -146,6 +157,47 @@ export const mockAttendance: AttendanceRecord[] = [
     status: "absent",
     source: null,
     notes: null,
+  },
+];
+
+export const mockNotifications: Notification[] = [
+  {
+    id: "notif-004",
+    user_id: mockEmployee.id,
+    type: "approval_required",
+    title: "Sent to HR for review",
+    message:
+      "Your correction for Sep 18 needs HR approval because it creates overtime.",
+    is_read: false,
+    created_at: at("2026-09-21", "09:12:00"),
+  },
+  {
+    id: "notif-003",
+    user_id: mockEmployee.id,
+    type: "request_completed",
+    title: "Correction applied",
+    message: "Your clock-out for Sep 16 was updated to 5:10 PM.",
+    is_read: false,
+    created_at: at("2026-09-17", "08:22:00"),
+  },
+  {
+    id: "notif-002",
+    user_id: mockEmployee.id,
+    type: "request_rejected",
+    title: "Request rejected",
+    message:
+      "Your correction for Sep 11 was rejected. File off-site work as a field assignment instead.",
+    is_read: true,
+    created_at: at("2026-09-14", "14:40:00"),
+  },
+  {
+    id: "notif-001",
+    user_id: mockEmployee.id,
+    type: "request_submitted",
+    title: "Request received",
+    message: "Your correction for Sep 11 was submitted and is being reviewed.",
+    is_read: true,
+    created_at: at("2026-09-14", "10:05:00"),
   },
 ];
 

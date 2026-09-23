@@ -2,11 +2,12 @@
 
 ## Current Phase
 
-Phase 1 — Project Foundation
+Phase 4 — Employee Experience
 
 ## Project Status
 
-In Progress
+In Progress. The employee interface is built and runs on mock fixtures in `lib/mock/`.
+Nothing is persisted yet, because the database schema has not been applied.
 
 ---
 
@@ -105,14 +106,29 @@ the middleware file convention; this was migrated with the official codemod.
 
 # Phase 4 — Employee Experience
 
-- [ ] Employee dashboard
-- [ ] Attendance history
+- [x] Employee dashboard
+- [x] Attendance history
 - [ ] Attendance detail
-- [ ] Correction request form
-- [ ] Natural-language request
-- [ ] Request summary
-- [ ] Request status
-- [ ] Notifications
+- [x] Correction request form
+- [x] Natural-language request
+- [x] Request summary
+- [x] Request status
+- [x] Notifications
+
+## Phase 4 Notes
+
+Every screen here is built, renders, and has been checked at desktop and phone width with
+no console errors. What "done" means for this phase is that the interface is complete and
+correct against fixtures in `lib/mock/data.ts` whose shapes match `types/domain.ts`
+exactly. No screen reads from or writes to the database, so swapping the data source is
+the remaining work, not a rewrite.
+
+Submission is deliberately disabled. Analysis and filing are separate steps, and until a
+correction can actually be written and confirmed, offering a button that appears to file
+one would breach the rule in `docs/UI_UX.md` section 13 that an AI recommendation must
+never look like a completed action.
+
+Attendance detail remains unbuilt; the list views cover the specified employee flows.
 
 ---
 
@@ -120,15 +136,36 @@ the middleware file convention; this was migrated with the official codemod.
 
 - [ ] Agent architecture
 - [ ] Agent prompt
-- [ ] Structured output
+- [x] Structured output
 - [ ] Tool architecture
 - [ ] Employee context tool
 - [ ] Attendance retrieval tool
 - [ ] Schedule retrieval tool
 - [ ] Correction history tool
-- [ ] Attendance rule evaluation
-- [ ] AI decision validation
+- [x] Attendance rule evaluation
+- [x] AI decision validation
 - [ ] AI decision logging
+
+## Phase 5 Notes
+
+Three items are complete ahead of the agent itself, because they are the parts that must
+not depend on it.
+
+`lib/services/correction-rules.service.ts` evaluates a correction deterministically and
+consults no model. It resolves all four decision types, aggregates every rule that fires,
+and returns the most restrictive outcome, so a request can never slip through because a
+permissive rule happened to be evaluated last. All five paths were exercised through the
+UI: automatic approval, overtime, existing-attendance protection, a locked payroll period,
+and a missed filing deadline.
+
+`lib/validations/correction.schema.ts` defines the structured contract and parses the
+extraction at the boundary rather than trusting it, which is what
+`docs/technical_architecture.md` section 8 requires once that output comes from a model.
+
+`lib/ai/extract-request.ts` is an explicitly marked placeholder. It reads dates and times
+with regular expressions and returns null for anything it cannot read confidently, which
+routes the request to NEEDS_CLARIFICATION instead of guessing. Replacing its body with an
+agent call requires no change to the contract or to anything downstream.
 
 ---
 

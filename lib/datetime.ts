@@ -56,6 +56,88 @@ export function hoursBetweenClockTimes(start: string, end: string) {
   return (endHour * 60 + endMinute - (startHour * 60 + startMinute)) / 60;
 }
 
+/**
+ * Minutes since midnight that a timestamp falls on in a given timezone. Comparing a
+ * timestamp against a schedule's wall-clock end time is only meaningful once both are
+ * expressed in the same zone, which is what this makes possible.
+ */
+export function minutesSinceMidnight(
+  iso: string,
+  timeZone: string = DEFAULT_TIMEZONE,
+) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone,
+  }).formatToParts(new Date(iso));
+
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 0);
+  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
+  return hour * 60 + minute;
+}
+
+/** Offset of a timezone, in minutes, at a specific instant. Accounts for DST. */
+function timezoneOffsetMinutes(instant: Date, timeZone: string) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })
+      .formatToParts(instant)
+      .map((part) => [part.type, part.value]),
+  );
+
+  const asIfUtc = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second),
+  );
+
+  return (asIfUtc - instant.getTime()) / 60_000;
+}
+
+/**
+ * Builds a timestamp from a calendar date and a wall-clock time as read in a given
+ * timezone. "5:10 PM on 22 September in Manila" is a different instant from the same
+ * wall-clock reading elsewhere, and storing the wrong one silently shifts payroll hours.
+ */
+export function zonedTimeToIso(
+  date: string,
+  hour: number,
+  minute: number,
+  timeZone: string = DEFAULT_TIMEZONE,
+) {
+  const naive = new Date(
+    `${date}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00Z`,
+  );
+
+  const offset = timezoneOffsetMinutes(naive, timeZone);
+  return new Date(naive.getTime() - offset * 60_000).toISOString();
+}
+
+/** Minutes since midnight for a bare HH:MM:SS wall-clock time. */
+export function clockTimeToMinutes(time: string) {
+  const [hour, minute] = time.split(":").map(Number);
+  return hour * 60 + minute;
+}
+
+/** Whole days from `from` to `to`, both YYYY-MM-DD. Negative when `to` is earlier. */
+export function daysBetweenDates(from: string, to: string) {
+  const ms =
+    new Date(`${to}T00:00:00Z`).getTime() - new Date(`${from}T00:00:00Z`).getTime();
+  return Math.round(ms / 86_400_000);
+}
+
 /** 0 = Sunday through 6 = Saturday, matching work_schedules.day_of_week. */
 export function weekdayIndex(date: string) {
   return new Date(`${date}T00:00:00Z`).getUTCDay();
