@@ -117,10 +117,10 @@ policies have never been exercised because no user holds those roles yet.
 # Phase 3 — Authentication
 
 - [x] Employee authentication
-- [ ] HR authentication
+- [x] HR authentication
 - [ ] Admin authentication
 - [x] Protected routes
-- [ ] Role-based authorization
+- [x] Role-based authorization
 - [x] Session handling
 - [x] Logout
 - [x] Unauthorized access handling
@@ -209,7 +209,7 @@ agent call requires no change to the contract or to anything downstream.
 # Phase 6 — Workflow Automation
 
 - [x] Automatic correction workflow
-- [ ] HR approval workflow
+- [x] HR approval workflow
 - [x] Rejection workflow
 - [x] Clarification workflow
 - [x] Attendance update
@@ -237,22 +237,42 @@ A failed automatic apply no longer strands the request. It escalates to HR and l
 `correction_apply_failed`, because leaving it approved-but-unapplied would also make a
 retry look like a duplicate and silently do nothing.
 
-The HR approval workflow is unchecked. An escalated correction creates the approval request
-correctly, but nothing can act on it until the HR dashboard exists.
+The HR approval workflow is now complete and verified — see the Phase 7 notes.
 
 ---
 
 # Phase 7 — HR Dashboard
 
-- [ ] HR dashboard
-- [ ] Pending approvals
-- [ ] Attendance exceptions
-- [ ] AI escalations
-- [ ] Request detail
-- [ ] Approve request
-- [ ] Reject request
-- [ ] Request clarification
-- [ ] Audit log viewer
+- [x] HR dashboard
+- [x] Pending approvals
+- [x] Attendance exceptions
+- [x] AI escalations
+- [x] Request detail
+- [x] Approve request
+- [x] Reject request
+- [x] Request clarification
+- [x] Audit log viewer
+
+## Phase 7 Notes
+
+All three review actions were exercised against the database, not judged from the
+interface. Approving wrote the clock-out, flipped the record to `present`, completed the
+request with `reviewed_by` set, resolved the approval, and logged `correction_approved`
+under `actor_type: hr`. Rejecting left attendance **completely untouched** — still
+`09:02`, status `late`, source `biometric` — while recording the reviewer's reason and
+sending it to the employee verbatim. Requesting clarification notified the employee and
+deliberately left the request in the queue, which the queue count confirmed.
+
+Approval reuses `applyPunchesToAttendance`, the same function the automatic path uses, so
+the read-back verification cannot drift between the two routes.
+
+Authorization rests on RLS rather than an application role check. The status change runs
+through the session client, so the staff-only policy is what permits the review, and the
+update is conditional on the row still being `pending_hr` — an atomic claim that stops two
+reviewers double-applying one correction.
+
+The dashboard is role-aware rather than a separate route, since most HR accounts have no
+employee record and the employee view would be empty for them.
 
 ---
 
