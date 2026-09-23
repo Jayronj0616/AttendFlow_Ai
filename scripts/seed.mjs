@@ -33,6 +33,7 @@ const db = createClient(url, serviceKey, {
 });
 
 const DEMO_EMAIL = "maria.santos@example.com";
+const HR_EMAIL = "hr.lead@example.com";
 const at = (date, time) => `${date}T${time}+08:00`;
 
 function check(label, { error }) {
@@ -46,26 +47,28 @@ function check(label, { error }) {
 // --- Auth user ---------------------------------------------------------------
 
 const { data: existing } = await db.auth.admin.listUsers();
-const priorUser = existing?.users.find((u) => u.email === DEMO_EMAIL);
 
-if (priorUser) {
-  await db.auth.admin.deleteUser(priorUser.id);
-  console.log("  removed previous demo user");
+async function recreateUser(email) {
+  const prior = existing?.users.find((u) => u.email === email);
+  if (prior) await db.auth.admin.deleteUser(prior.id);
+
+  const { data, error } = await db.auth.admin.createUser({
+    email,
+    password: demoPassword,
+    email_confirm: true,
+  });
+
+  if (error) {
+    console.error(`create ${email}: ${error.message}`);
+    process.exit(1);
+  }
+
+  console.log(`  auth user ${email}`);
+  return data.user.id;
 }
 
-const { data: created, error: createError } = await db.auth.admin.createUser({
-  email: DEMO_EMAIL,
-  password: demoPassword,
-  email_confirm: true,
-});
-
-if (createError) {
-  console.error(`create demo user: ${createError.message}`);
-  process.exit(1);
-}
-
-const userId = created.user.id;
-console.log(`  created demo user ${DEMO_EMAIL}`);
+const userId = await recreateUser(DEMO_EMAIL);
+const hrUserId = await recreateUser(HR_EMAIL);
 
 // --- Reference data -----------------------------------------------------------
 
@@ -110,6 +113,21 @@ check(
     first_name: "Maria",
     last_name: "Santos",
     email: DEMO_EMAIL,
+    is_active: true,
+  }),
+);
+
+// No employee_id: HR staff here review attendance rather than record their own, which also
+// exercises the "no employee record linked" path on the employee-facing pages.
+check(
+  "hr profile",
+  await db.from("profiles").upsert({
+    id: hrUserId,
+    employee_id: null,
+    role: "hr",
+    first_name: "Ana",
+    last_name: "Reyes",
+    email: HR_EMAIL,
     is_active: true,
   }),
 );
@@ -203,9 +221,9 @@ const recordFor = (date) =>
 
 // --- Correction requests ----------------------------------------------------------
 
-check(
-  "correction requests",
-  await db.from("correction_requests").insert([
+const { data: seededRequests, error: requestsError } = await db
+  .from("correction_requests")
+  .insert([
     {
       employee_id: employee.id,
       attendance_record_id: recordFor("2026-09-18"),
@@ -250,7 +268,27 @@ check(
       reviewed_at: at("2026-09-14", "14:40:00"),
       completed_at: at("2026-09-14", "14:40:00"),
     },
-  ]),
+  ])
+  .select();
+
+if (requestsError) {
+  console.error(`correction requests: ${requestsError.message}`);
+  process.exit(1);
+}
+console.log(`  correction requests (${seededRequests.length})`);
+
+// Every escalated correction needs its matching approval row, or the HR queue would show
+// a request nobody can act on.
+const pending = seededRequests.filter((r) => r.status === "pending_hr");
+
+check(
+  "approval requests",
+  await db.from("approval_requests").insert(
+    pending.map((request) => ({
+      correction_request_id: request.id,
+      status: "pending",
+    })),
+  ),
 );
 
 check(
@@ -285,4 +323,8 @@ check(
   ]),
 );
 
-console.log(`\nSeeded. Sign in as ${DEMO_EMAIL} with SEED_DEMO_PASSWORD.`);
+console.log(
+  `\nSeeded. Sign in with SEED_DEMO_PASSWORD as:\n` +
+    `  employee  ${DEMO_EMAIL}\n` +
+    `  HR        ${HR_EMAIL}`,
+);
