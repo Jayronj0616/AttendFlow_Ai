@@ -117,7 +117,81 @@ export async function getAuditLogs(limit = 100): Promise<AuditLog[]> {
   return data ?? [];
 }
 
+/** The rules that fired when the request was evaluated, as stored at decision time. */
+export async function getTriggeredRules(
+  requestId: string,
+): Promise<{ code: string; label: string; detail: string }[]> {
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("ai_decisions")
+    .select("output_summary")
+    .eq("correction_request_id", requestId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const summary = data?.output_summary;
+  if (!summary || typeof summary !== "object" || Array.isArray(summary)) {
+    return [];
+  }
+
+  const rules = (summary as { triggered_rules?: unknown }).triggered_rules;
+  if (!Array.isArray(rules)) return [];
+
+  // Shape-checked rather than cast: this is jsonb written at an earlier point in time and
+  // an older row may not match the current structure.
+  return rules.filter(
+    (rule): rule is { code: string; label: string; detail: string } =>
+      typeof rule === "object" &&
+      rule !== null &&
+      typeof (rule as { code?: unknown }).code === "string" &&
+      typeof (rule as { label?: unknown }).label === "string" &&
+      typeof (rule as { detail?: unknown }).detail === "string",
+  );
+}
+
 export type ReviewResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Asks the employee for more detail without deciding the request.
+ *
+ * The request deliberately stays in the queue. Moving it out would hide a correction that
+ * still needs an answer, and nothing about the attendance record has changed.
+ */
+export async function requestClarification(
+  requestId: string,
+  reviewerId: string,
+  comment: string,
+): Promise<ReviewResult> {
+  const supabase = await createClient();
+
+  const { data: request } = await supabase
+    .from("correction_requests")
+    .select("*")
+    .eq("id", requestId)
+    .eq("status", "pending_hr")
+    .maybeSingle();
+
+  if (!request) {
+    return { ok: false, error: "This request is no longer awaiting review." };
+  }
+
+  await createAdminClient()
+    .from("approval_requests")
+    .update({ comment, approver_id: reviewerId })
+    .eq("correction_request_id", requestId);
+
+  await recordReview(requestId, reviewerId, "correction_clarification_requested");
+  await notifyEmployee(
+    request.employee_id,
+    "clarification_requested",
+    "More detail needed",
+    comment,
+  );
+
+  return { ok: true };
+}
 
 /**
  * Approves a correction and applies it.

@@ -1,6 +1,8 @@
+import { EMPTY_VALUE, formatTime } from "@/lib/datetime";
 import type {
   AiDecision,
   AttendanceStatus,
+  CorrectionRequest,
   CorrectionRequestStatus,
 } from "@/types/domain";
 
@@ -41,3 +43,20 @@ export const AI_DECISION_DISPLAY: Record<AiDecision, Display> = {
   needs_clarification: { label: "Needs clarification", tone: "info" },
   reject: { label: "Rejected", tone: "danger" },
 };
+
+/** One-line summary of what a request would change, for list rows. */
+export function describeRequestedChange(
+  request: Pick<CorrectionRequest, "requested_clock_in" | "requested_clock_out">,
+  timeZone?: string,
+) {
+  const parts: string[] = [];
+
+  if (request.requested_clock_in) {
+    parts.push(`Clock-in ${formatTime(request.requested_clock_in, timeZone)}`);
+  }
+  if (request.requested_clock_out) {
+    parts.push(`Clock-out ${formatTime(request.requested_clock_out, timeZone)}`);
+  }
+
+  return parts.length > 0 ? parts.join(" · ") : EMPTY_VALUE;
+}

@@ -7,8 +7,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { EMPTY_VALUE, formatDate, formatTime } from "@/lib/datetime";
-import { REQUEST_STATUS_DISPLAY } from "@/lib/status";
+import { formatDate } from "@/lib/datetime";
+import { describeRequestedChange, REQUEST_STATUS_DISPLAY } from "@/lib/status";
 import type { CorrectionRequest } from "@/types/domain";
 
 type CorrectionRequestListProps = {
@@ -89,15 +89,3 @@ export function CorrectionRequestList({
   );
 }
 
-function describeRequestedChange(request: CorrectionRequest) {
-  const parts: string[] = [];
-
-  if (request.requested_clock_in) {
-    parts.push(`Clock-in ${formatTime(request.requested_clock_in)}`);
-  }
-  if (request.requested_clock_out) {
-    parts.push(`Clock-out ${formatTime(request.requested_clock_out)}`);
-  }
-
-  return parts.length > 0 ? parts.join(" · ") : EMPTY_VALUE;
-}
