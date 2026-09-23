@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/attendance/StatusBadge";
 import { EmptyState } from "@/components/common/EmptyState";
 import { CorrectionRequestList } from "@/components/corrections/CorrectionRequestList";
 import { StatTile } from "@/components/dashboard/StatTile";
+import { HrOverview } from "@/components/hr/HrOverview";
 import { TopBar } from "@/components/layout/TopBar";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,6 +34,17 @@ export const metadata: Metadata = { title: "Dashboard" };
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
+
+  // Reviewers get the queue rather than their own attendance. Most HR accounts have no
+  // employee record, so the employee view would be empty for them anyway.
+  if (user && (user.profile.role === "hr" || user.profile.role === "admin")) {
+    return (
+      <>
+        <TopBar title="Dashboard" description="Attendance operations" />
+        <HrOverview />
+      </>
+    );
+  }
 
   if (!user?.employee) {
     return (

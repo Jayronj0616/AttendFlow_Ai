@@ -4,11 +4,25 @@ import { applyPunchesToAttendance } from "@/lib/services/corrections.service";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type {
+  ActorType,
   AttendanceRecord,
   AuditLog,
   CorrectionRequest,
   Employee,
 } from "@/types/domain";
+
+const ACTOR_TYPES: ActorType[] = [
+  "employee",
+  "hr",
+  "admin",
+  "ai_agent",
+  "system",
+];
+
+/** Narrows an arbitrary query-string value to a real actor type, or undefined. */
+export function parseActorType(value: string | undefined): ActorType | undefined {
+  return ACTOR_TYPES.find((actor) => actor === value);
+}
 
 export type RequestWithContext = {
   request: CorrectionRequest;
@@ -105,16 +119,49 @@ export async function getAttendanceExceptions(
   }));
 }
 
-export async function getAuditLogs(limit = 100): Promise<AuditLog[]> {
+export type AuditEntry = { log: AuditLog; actorName: string | null };
+
+/** Audit rows with actor names resolved, since a raw UUID tells a reviewer nothing. */
+export async function getAuditLogs(
+  limit = 100,
+  actorType?: ActorType,
+): Promise<AuditEntry[]> {
   const supabase = await createClient();
 
-  const { data } = await supabase
+  let query = supabase
     .from("audit_logs")
     .select("*")
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  return data ?? [];
+  if (actorType) query = query.eq("actor_type", actorType);
+
+  const { data: logs } = await query;
+  if (!logs || logs.length === 0) return [];
+
+  const actorIds = [
+    ...new Set(logs.map((log) => log.actor_id).filter((id) => id !== null)),
+  ];
+
+  const names = new Map<string, string>();
+  if (actorIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, first_name, last_name, email")
+      .in("id", actorIds);
+
+    for (const profile of profiles ?? []) {
+      const name = [profile.first_name, profile.last_name]
+        .filter(Boolean)
+        .join(" ");
+      names.set(profile.id, name || (profile.email ?? "Unknown"));
+    }
+  }
+
+  return logs.map((log) => ({
+    log,
+    actorName: log.actor_id ? (names.get(log.actor_id) ?? null) : null,
+  }));
 }
 
 /** The rules that fired when the request was evaluated, as stored at decision time. */
