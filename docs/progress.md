@@ -132,7 +132,7 @@ the table, "Maria sees only her own" would prove nothing.
 
 - [x] Employee authentication
 - [x] HR authentication
-- [ ] Admin authentication
+- [x] Admin authentication
 - [x] Protected routes
 - [x] Role-based authorization
 - [x] Session handling
@@ -148,10 +148,18 @@ browser. `proxy.ts` guards every path outside `/login`, and a signed-in user vis
 The sign-in error deliberately does not distinguish an unknown address from a wrong
 password, which would otherwise let anyone probe which email addresses have accounts.
 
-HR and admin authentication are unchecked because no user holds those roles yet. Role-based
-authorization is written — navigation filters by role and the RLS policies branch on
-`auth_is_staff()` and `auth_is_admin()` — but nothing has exercised those branches, so it
-is not claimed as done.
+All three roles now exist in the seed and have been signed in as. Role-based authorization
+is exercised end to end: navigation filters by role, the HR and administration sections are
+guarded by layouts that render not-found rather than redirecting, and the RLS policies
+branching on `auth_is_staff()` and `auth_is_admin()` are covered by `pnpm db:verify-rls`.
+
+The administration section covers the employee directory and attendance rules. Editing a
+rule writes the previous and new configuration to the audit log, because a rule quietly
+loosening is precisely the change that needs a trail — verified by changing the overtime
+threshold from 60 to 90 minutes and reading both the rule and its audit row back.
+
+Locked payroll periods stay read-only. They are a list of date ranges rather than a number,
+and a free-form JSON field on a rule that governs payroll is not a safe control.
 
 ---
 

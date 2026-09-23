@@ -37,6 +37,7 @@ const HR_EMAIL = "hr.lead@example.com";
 // A second employee exists so RLS isolation can be tested for real. Without another
 // employee's rows in the table, "Maria sees only her own" proves nothing.
 const OTHER_EMAIL = "diego.cruz@example.com";
+const ADMIN_EMAIL = "admin@example.com";
 const at = (date, time) => `${date}T${time}+08:00`;
 
 function check(label, { error }) {
@@ -73,6 +74,7 @@ async function recreateUser(email) {
 const userId = await recreateUser(DEMO_EMAIL);
 const hrUserId = await recreateUser(HR_EMAIL);
 const otherUserId = await recreateUser(OTHER_EMAIL);
+const adminUserId = await recreateUser(ADMIN_EMAIL);
 
 // --- Reference data -----------------------------------------------------------
 
@@ -177,6 +179,19 @@ check(
     first_name: "Ana",
     last_name: "Reyes",
     email: HR_EMAIL,
+    is_active: true,
+  }),
+);
+
+check(
+  "admin profile",
+  await db.from("profiles").upsert({
+    id: adminUserId,
+    employee_id: null,
+    role: "admin",
+    first_name: "System",
+    last_name: "Administrator",
+    email: ADMIN_EMAIL,
     is_active: true,
   }),
 );
@@ -376,5 +391,6 @@ console.log(
   `\nSeeded. Sign in with SEED_DEMO_PASSWORD as:\n` +
     `  employee  ${DEMO_EMAIL}\n` +
     `  employee  ${OTHER_EMAIL}\n` +
-    `  HR        ${HR_EMAIL}`,
+    `  HR        ${HR_EMAIL}\n` +
+    `  admin     ${ADMIN_EMAIL}`,
 );
