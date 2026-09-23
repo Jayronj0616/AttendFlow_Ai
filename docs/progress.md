@@ -89,7 +89,7 @@ the middleware file convention; this was migrated with the official codemod.
 - [x] Create relationships
 - [x] Add indexes
 - [x] Configure RLS
-- [ ] Test RLS
+- [x] Test RLS
 - [x] Add development seed data
 
 ## Phase 2 Notes
@@ -108,9 +108,23 @@ clock-out that precedes its clock-in, and `correction_requests` carries a unique
 `idempotency_key` so a resubmitted correction collapses onto one row instead of creating a
 second.
 
-RLS testing stays unchecked. Employee-scoped reads have been exercised through the running
-application, and an unauthenticated request correctly returns no rows, but the HR and admin
-policies have never been exercised because no user holds those roles yet.
+RLS is verified by `pnpm db:verify-rls`, which signs in as each seeded role through the
+anon key — the same path the application uses — and asserts what each one can and cannot
+reach. It deliberately avoids the service role, which bypasses RLS and would prove nothing.
+All seventeen checks pass.
+
+The suite is not vacuous, and the two halves validate each other: the HR checks prove rows
+belonging to several employees genuinely exist in the table, while the employee checks
+prove only one employee's rows come back. A policy that failed open would break the second
+half while the first still passed.
+
+It covers the cases worth worrying about — an anonymous caller reading nothing at all, one
+employee reading another's attendance, an employee approving their own correction, and any
+client writing attendance directly, which no role may do because corrections are applied by
+the server after the rules have run.
+
+The seed therefore creates a second employee on purpose. Without another employee's rows in
+the table, "Maria sees only her own" would prove nothing.
 
 ---
 
@@ -314,11 +328,14 @@ whose local zone already matches the schedule.
 
 ## Security
 
-- [ ] Employee accessing another employee
-- [ ] Employee attempting HR action
-- [ ] Unauthorized API request
-- [ ] Invalid session
-- [ ] RLS verification
+- [x] Employee accessing another employee
+- [x] Employee attempting HR action
+- [x] Unauthorized API request
+- [x] Invalid session
+- [x] RLS verification
+
+All covered by `pnpm db:verify-rls`. "Invalid session" is exercised as the anonymous case:
+a client holding no valid session reads nothing from any table.
 
 ## AI
 

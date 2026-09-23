@@ -34,6 +34,9 @@ const db = createClient(url, serviceKey, {
 
 const DEMO_EMAIL = "maria.santos@example.com";
 const HR_EMAIL = "hr.lead@example.com";
+// A second employee exists so RLS isolation can be tested for real. Without another
+// employee's rows in the table, "Maria sees only her own" proves nothing.
+const OTHER_EMAIL = "diego.cruz@example.com";
 const at = (date, time) => `${date}T${time}+08:00`;
 
 function check(label, { error }) {
@@ -69,10 +72,11 @@ async function recreateUser(email) {
 
 const userId = await recreateUser(DEMO_EMAIL);
 const hrUserId = await recreateUser(HR_EMAIL);
+const otherUserId = await recreateUser(OTHER_EMAIL);
 
 // --- Reference data -----------------------------------------------------------
 
-await db.from("employees").delete().eq("employee_number", "EMP-0142");
+await db.from("employees").delete().in("employee_number", ["EMP-0142", "EMP-0207"]);
 await db.from("departments").delete().eq("name", "Operations");
 
 const { data: department } = await db
@@ -114,6 +118,51 @@ check(
     last_name: "Santos",
     email: DEMO_EMAIL,
     is_active: true,
+  }),
+);
+
+const { data: otherEmployee, error: otherEmployeeError } = await db
+  .from("employees")
+  .insert({
+    employee_number: "EMP-0207",
+    first_name: "Diego",
+    last_name: "Cruz",
+    email: OTHER_EMAIL,
+    department_id: department.id,
+    position: "Warehouse Associate",
+    employment_status: "active",
+  })
+  .select()
+  .single();
+
+if (otherEmployeeError) {
+  console.error(`second employee: ${otherEmployeeError.message}`);
+  process.exit(1);
+}
+console.log("  second employee");
+
+check(
+  "second employee profile",
+  await db.from("profiles").upsert({
+    id: otherUserId,
+    employee_id: otherEmployee.id,
+    role: "employee",
+    first_name: "Diego",
+    last_name: "Cruz",
+    email: OTHER_EMAIL,
+    is_active: true,
+  }),
+);
+
+check(
+  "second employee attendance",
+  await db.from("attendance_records").insert({
+    employee_id: otherEmployee.id,
+    attendance_date: "2026-09-22",
+    clock_in: at("2026-09-22", "07:45:00"),
+    clock_out: at("2026-09-22", "17:00:00"),
+    status: "present",
+    source: "biometric",
   }),
 );
 
@@ -326,5 +375,6 @@ check(
 console.log(
   `\nSeeded. Sign in with SEED_DEMO_PASSWORD as:\n` +
     `  employee  ${DEMO_EMAIL}\n` +
+    `  employee  ${OTHER_EMAIL}\n` +
     `  HR        ${HR_EMAIL}`,
 );
