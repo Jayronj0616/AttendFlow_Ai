@@ -17,13 +17,18 @@ Supabase (Postgres, Auth, RLS) · Vercel
 
 ```bash
 pnpm install
-cp .env.example .env.local
+cp .env.example .env.local   # fill in the Supabase values
+pnpm db:push                 # apply migrations
+node scripts/seed.mjs        # demo employee and attendance history
 pnpm dev
 ```
 
-`.env.local` currently ships with placeholder values. Nothing will connect until a Supabase
-project is provisioned and the real URL and keys are filled in. `lib/env.ts` validates
-these at startup and will throw immediately if one is missing or malformed.
+`lib/env.ts` validates the environment at startup and throws immediately if a variable is
+missing or malformed, rather than failing later at the first query.
+
+Use the **session pooler** connection string for `SUPABASE_DB_URL`, not the direct
+`db.<ref>.supabase.co` host — that one publishes only an IPv6 address and is unreachable
+from an IPv4 network.
 
 ## Scripts
 
@@ -33,7 +38,12 @@ these at startup and will throw immediately if one is missing or malformed.
 | `pnpm build` | Production build |
 | `pnpm typecheck` | TypeScript with no emit |
 | `pnpm lint` | ESLint |
-| `pnpm db:types` | Regenerate `types/database.types.ts` from the linked Supabase project |
+| `pnpm test` | Vitest |
+| `pnpm db:push` | Apply `supabase/migrations` to the remote database |
+| `pnpm db:types` | Regenerate `types/database.types.ts` (needs `SUPABASE_ACCESS_TOKEN`) |
+
+No Docker is required. Migrations go straight to Postgres over the pooler, and type
+generation uses the Management API rather than the container-based `--db-url` path.
 
 ## Structure
 

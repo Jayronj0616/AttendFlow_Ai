@@ -2,6 +2,7 @@ import {
   clockTimeToMinutes,
   daysBetweenDates,
   formatTime,
+  isSameInstant,
   minutesSinceMidnight,
 } from "@/lib/datetime";
 import type {
@@ -185,7 +186,7 @@ function existingAttendanceConflicts(
   ] as const;
 
   for (const [label, current, requested] of pairs) {
-    if (current && requested && current !== requested) {
+    if (current && requested && !isSameInstant(current, requested)) {
       conflicts.push({
         code: "existing_attendance_protected",
         label: "Existing attendance",

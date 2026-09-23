@@ -138,6 +138,30 @@ export function daysBetweenDates(from: string, to: string) {
   return Math.round(ms / 86_400_000);
 }
 
+/**
+ * Whether two timestamps denote the same moment.
+ *
+ * Never compare timestamps as strings. The same instant has many valid spellings —
+ * `2026-09-22T09:10:00.000Z` and `2026-09-22T17:10:00+08:00` are equal — so `===` reports
+ * a difference that does not exist. Postgres also returns its own spelling, which rarely
+ * matches whatever the application sent.
+ */
+export function isSameInstant(a: string | null, b: string | null) {
+  if (a === null || b === null) return a === b;
+  return new Date(a).getTime() === new Date(b).getTime();
+}
+
+/** Today's calendar date in a timezone, as YYYY-MM-DD. */
+export function todayInTimezone(timeZone: string = DEFAULT_TIMEZONE) {
+  // en-CA formats as YYYY-MM-DD, which is the shape the date columns use.
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
 /** 0 = Sunday through 6 = Saturday, matching work_schedules.day_of_week. */
 export function weekdayIndex(date: string) {
   return new Date(`${date}T00:00:00Z`).getUTCDay();

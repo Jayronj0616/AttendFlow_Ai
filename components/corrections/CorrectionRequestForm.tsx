@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Loader2 } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { CheckCircle2, Loader2 } from "lucide-react";
 
 import { AiAnalysisPanel } from "@/components/corrections/AiAnalysisPanel";
 import { Button } from "@/components/ui/button";
@@ -11,15 +13,26 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
   analyzeCorrection,
+  submitCorrection,
   type CorrectionAnalysis,
 } from "@/lib/actions/corrections.actions";
 import { AI_DECISION_DISPLAY } from "@/lib/status";
 
+type Outcome = {
+  duplicate: boolean;
+  /** Reflects what actually happened to the record, not what the decision permitted. */
+  applied: boolean;
+};
+
 export function CorrectionRequestForm() {
+  const router = useRouter();
   const [message, setMessage] = useState("");
   const [analysis, setAnalysis] = useState<CorrectionAnalysis | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [isSubmitting, startSubmit] = useTransition();
   const resultRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -30,6 +43,9 @@ export function CorrectionRequestForm() {
   }, [analysis]);
 
   function handleAnalyze() {
+    setOutcome(null);
+    setSubmitError(null);
+
     startTransition(async () => {
       const result = await analyzeCorrection(message);
 
@@ -43,7 +59,30 @@ export function CorrectionRequestForm() {
     });
   }
 
+  function handleSubmit() {
+    if (!analysis?.requested_date) return;
+
+    startSubmit(async () => {
+      const result = await submitCorrection({
+        requested_date: analysis.requested_date!,
+        requested_clock_in: analysis.requested_clock_in,
+        requested_clock_out: analysis.requested_clock_out,
+        employee_reason: analysis.employee_reason,
+      });
+
+      if (result.ok) {
+        setOutcome({ duplicate: result.duplicate, applied: result.applied });
+        setSubmitError(null);
+        router.refresh();
+      } else {
+        setSubmitError(result.error);
+      }
+    });
+  }
+
   const decision = analysis?.evaluation.decision;
+  const canSubmit =
+    decision === "auto_approve" || decision === "requires_hr_approval";
 
   return (
     <div className="space-y-6">
@@ -63,7 +102,7 @@ export function CorrectionRequestForm() {
             onChange={(event) => setMessage(event.target.value)}
             placeholder="I forgot to clock out yesterday at 5:10 PM."
             rows={4}
-            disabled={isPending}
+            disabled={isPending || isSubmitting}
             aria-describedby={error ? "correction-error" : undefined}
             aria-invalid={error ? true : undefined}
           />
@@ -77,7 +116,10 @@ export function CorrectionRequestForm() {
             </p>
           ) : null}
           <div className="flex justify-end">
-            <Button onClick={handleAnalyze} disabled={isPending}>
+            <Button
+              onClick={handleAnalyze}
+              disabled={isPending || isSubmitting}
+            >
               {isPending ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />
@@ -98,9 +140,11 @@ export function CorrectionRequestForm() {
       <p className="sr-only" role="status" aria-live="polite">
         {isPending
           ? "Analysing the request."
-          : analysis
-            ? `Analysis complete. ${AI_DECISION_DISPLAY[analysis.evaluation.decision].label}. ${analysis.evaluation.reason}`
-            : ""}
+          : outcome
+            ? outcomeMessage(outcome)
+            : analysis
+              ? `Analysis complete. ${AI_DECISION_DISPLAY[analysis.evaluation.decision].label}. ${analysis.evaluation.reason}`
+              : ""}
       </p>
 
       {isPending ? (
@@ -112,30 +156,82 @@ export function CorrectionRequestForm() {
         >
           <AiAnalysisPanel analysis={analysis} />
 
-          <Card>
-            <CardContent className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="space-y-1">
-                  {/* The spec is explicit that a recommendation must never read as a
-                      completed action, so the unfiled state is stated outright. */}
-                  <p className="text-sm font-medium">
-                    Nothing has been filed yet.
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {submitHint(decision)}
-                  </p>
+          {outcome ? (
+            <Card>
+              <CardContent className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex gap-3">
+                  <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-success" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">
+                      {outcome.duplicate
+                        ? "Already submitted"
+                        : outcome.applied
+                          ? "Correction applied"
+                          : "Sent to HR"}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {outcomeMessage(outcome)}
+                    </p>
+                  </div>
                 </div>
-                <Button disabled>Submit request</Button>
-              </div>
-              <p className="border-t pt-3 text-xs text-muted-foreground">
-                Filing is enabled once the attendance database is connected.
-              </p>
-            </CardContent>
-          </Card>
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/corrections">View requests</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    {/* The spec is explicit that a recommendation must never read as a
+                        completed action, so the unfiled state is stated outright. */}
+                    <p className="text-sm font-medium">
+                      Nothing has been filed yet.
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {submitHint(decision)}
+                    </p>
+                  </div>
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={!canSubmit || isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin" />
+                        Submitting…
+                      </>
+                    ) : (
+                      "Submit request"
+                    )}
+                  </Button>
+                </div>
+                {submitError ? (
+                  <p
+                    role="alert"
+                    className="border-t pt-3 text-sm text-destructive"
+                  >
+                    {submitError}
+                  </p>
+                ) : null}
+              </CardContent>
+            </Card>
+          )}
         </div>
       ) : null}
     </div>
   );
+}
+
+function outcomeMessage(outcome: Outcome) {
+  if (outcome.duplicate) {
+    return "This exact correction was already filed, so nothing was duplicated.";
+  }
+
+  return outcome.applied
+    ? "Your attendance record has been updated and the change is recorded in the audit log."
+    : "An approval request is now waiting for HR. Your attendance is unchanged until they approve it.";
 }
 
 /** Mirrors the analysis panel's shape so the result settles in place rather than jumping. */

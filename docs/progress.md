@@ -2,12 +2,16 @@
 
 ## Current Phase
 
-Phase 4 — Employee Experience
+Phase 6 — Workflow Automation
 
 ## Project Status
 
-In Progress. The employee interface is built and runs on mock fixtures in `lib/mock/`.
-Nothing is persisted yet, because the database schema has not been applied.
+In Progress. The employee workflow runs end to end against the hosted Supabase project: an
+employee signs in, describes a correction, and the system evaluates it, writes it, verifies
+the write, and records the audit trail. Mock fixtures have been deleted.
+
+What remains is the HR side. An escalated correction creates an approval request, but no
+interface exists yet for HR to act on it.
 
 ---
 
@@ -16,9 +20,9 @@ Nothing is persisted yet, because the database schema has not been applied.
 - [x] Initialize Next.js application
 - [x] Configure TypeScript
 - [x] Configure Tailwind CSS
-- [ ] Configure Supabase
-- [ ] Configure Supabase Auth
-- [ ] Configure environment variables
+- [x] Configure Supabase
+- [x] Configure Supabase Auth
+- [x] Configure environment variables
 - [x] Establish project structure
 - [x] Verify local development
 - [ ] Verify Vercel compatibility
@@ -32,23 +36,22 @@ installed and building cleanly. `pnpm build`, `pnpm typecheck`, and `pnpm lint` 
 with no warnings. The dev server runs and the root page renders with the Poppins font and
 the full semantic colour token set resolving correctly in both light and dark mode.
 
-### Blocked on a Supabase project
+### Connection notes
 
-Four items remain unchecked because no Supabase project exists yet, so none of this has
-been verified against a live backend:
+The hosted Supabase project is connected and a full round trip has been confirmed: sign-in,
+reads through RLS, and a correction written and read back.
 
-- **Configure Supabase** — the three clients in `lib/supabase/` are written but have never
-  opened a real connection.
-- **Configure Supabase Auth** — session refresh is wired through `proxy.ts`, but no sign-in
-  has ever been performed against it.
-- **Configure environment variables** — `lib/env.ts` validates them and `.env.example`
-  documents them, but `.env.local` currently holds placeholder values.
-- **Verify Vercel compatibility** — the production build succeeds locally and the
-  architecture avoids local filesystem, long-running processes, and in-memory state, but
-  nothing has actually been deployed.
+Two environment details cost time and are worth recording. The direct database host
+`db.<ref>.supabase.co` publishes only an AAAA record, so it is unreachable from an IPv4
+network; the session pooler host must be used instead, and it is stored as
+`SUPABASE_DB_URL` in `.env.local`. Separately, the anon key appeared to be rejected while
+the service role key worked — that was misleading. The anon key was always valid, and the
+401 came from testing the PostgREST root against a database with no tables and therefore no
+grants to the `anon` role. It behaved correctly as soon as the schema existed.
 
-These are ticked once a Supabase project is provisioned, real credentials are in place, and
-a round trip is confirmed.
+Vercel compatibility stays unchecked because nothing has been deployed. The production
+build succeeds and the architecture avoids local filesystem, long-running processes, and
+in-memory state, but that is an argument rather than a verification.
 
 ### Deviations from the specification
 
@@ -72,35 +75,69 @@ the middleware file convention; this was migrated with the official codemod.
 
 # Phase 2 — Database
 
-- [ ] Create departments
-- [ ] Create employees
-- [ ] Create profiles
-- [ ] Create attendance_records
-- [ ] Create work_schedules
-- [ ] Create attendance_rules
-- [ ] Create correction_requests
-- [ ] Create approval_requests
-- [ ] Create ai_decisions
-- [ ] Create audit_logs
-- [ ] Create notifications
-- [ ] Create relationships
-- [ ] Add indexes
-- [ ] Configure RLS
+- [x] Create departments
+- [x] Create employees
+- [x] Create profiles
+- [x] Create attendance_records
+- [x] Create work_schedules
+- [x] Create attendance_rules
+- [x] Create correction_requests
+- [x] Create approval_requests
+- [x] Create ai_decisions
+- [x] Create audit_logs
+- [x] Create notifications
+- [x] Create relationships
+- [x] Add indexes
+- [x] Configure RLS
 - [ ] Test RLS
-- [ ] Add development seed data
+- [x] Add development seed data
+
+## Phase 2 Notes
+
+All eleven tables live in `supabase/migrations/20260923000001_initial_schema.sql`, applied
+with `pnpm db:push`. Seed data is created by `pnpm exec node scripts/seed.mjs`, which is
+idempotent — it removes the demo employee's rows before recreating them.
+
+One deviation from `docs/database.md`: the status and role columns it describes as TEXT are
+Postgres enums. Their value lists are already fixed, and an enum both rejects a bad value at
+the database and generates a TypeScript union rather than a bare `string`, which keeps
+decision handling exhaustively checked in application code.
+
+Two constraints were added beyond the specification. `attendance_records` rejects a
+clock-out that precedes its clock-in, and `correction_requests` carries a unique
+`idempotency_key` so a resubmitted correction collapses onto one row instead of creating a
+second.
+
+RLS testing stays unchecked. Employee-scoped reads have been exercised through the running
+application, and an unauthenticated request correctly returns no rows, but the HR and admin
+policies have never been exercised because no user holds those roles yet.
 
 ---
 
 # Phase 3 — Authentication
 
-- [ ] Employee authentication
+- [x] Employee authentication
 - [ ] HR authentication
 - [ ] Admin authentication
-- [ ] Protected routes
+- [x] Protected routes
 - [ ] Role-based authorization
-- [ ] Session handling
-- [ ] Logout
-- [ ] Unauthorized access handling
+- [x] Session handling
+- [x] Logout
+- [x] Unauthorized access handling
+
+## Phase 3 Notes
+
+Sign-in, sign-out, session refresh, and route protection work and were exercised in the
+browser. `proxy.ts` guards every path outside `/login`, and a signed-in user visiting
+`/login` is sent to the dashboard.
+
+The sign-in error deliberately does not distinguish an unknown address from a wrong
+password, which would otherwise let anyone probe which email addresses have accounts.
+
+HR and admin authentication are unchecked because no user holds those roles yet. Role-based
+authorization is written — navigation filters by role and the RLS policies branch on
+`auth_is_staff()` and `auth_is_admin()` — but nothing has exercised those branches, so it
+is not claimed as done.
 
 ---
 
@@ -171,15 +208,37 @@ agent call requires no change to the contract or to anything downstream.
 
 # Phase 6 — Workflow Automation
 
-- [ ] Automatic correction workflow
+- [x] Automatic correction workflow
 - [ ] HR approval workflow
-- [ ] Rejection workflow
-- [ ] Clarification workflow
-- [ ] Attendance update
-- [ ] Result verification
-- [ ] Employee notification
-- [ ] Audit logging
-- [ ] Idempotency protection
+- [x] Rejection workflow
+- [x] Clarification workflow
+- [x] Attendance update
+- [x] Result verification
+- [x] Employee notification
+- [x] Audit logging
+- [x] Idempotency protection
+
+## Phase 6 Notes
+
+The automatic path was confirmed against the database rather than from the interface
+message. Submitting "I forgot to clock out yesterday at 5:10 PM" set `clock_out` to
+`09:10:00+00:00` (5:10 PM Manila), flipped the record from `incomplete` to `present`,
+marked the request `completed`, and wrote rows to `ai_decisions`, `audit_logs`, and
+`notifications`.
+
+Result verification re-reads the row and compares it against what was asked for. This
+caught a real defect: the comparison was originally written on timestamp strings, and
+Postgres returns its own spelling of an instant, so a successful write was reported as a
+failure. Timestamps are now compared as instants through `isSameInstant`, and the same flaw
+was fixed in the rule engine's conflict check, where it would have raised a false conflict
+against an identical recorded punch. A regression test covers it.
+
+A failed automatic apply no longer strands the request. It escalates to HR and logs
+`correction_apply_failed`, because leaving it approved-but-unapplied would also make a
+retry look like a duplicate and silently do nothing.
+
+The HR approval workflow is unchecked. An escalated correction creates the approval request
+correctly, but nothing can act on it until the HR dashboard exists.
 
 ---
 

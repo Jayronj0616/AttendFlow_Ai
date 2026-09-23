@@ -1,21 +1,27 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import { extractCorrectionRequest } from "@/lib/ai/extract-request";
+import { todayInTimezone, weekdayIndex } from "@/lib/datetime";
 import {
-  MOCK_TODAY,
-  mockAttendance,
-  mockAttendanceRules,
-  mockCorrectionRequests,
-  mockSchedule,
-} from "@/lib/mock/data";
+  getAttendanceForDate,
+  getScheduleForDate,
+} from "@/lib/services/attendance.service";
+import {
+  countAutoAppliedInMonth,
+  submitCorrectionRequest,
+} from "@/lib/services/corrections.service";
 import {
   evaluateCorrection,
   type CorrectionEvaluation,
 } from "@/lib/services/correction-rules.service";
-import { weekdayIndex } from "@/lib/datetime";
+import { getCurrentUser } from "@/lib/services/profile.service";
+import { getAttendanceRuleConfig } from "@/lib/services/rules.service";
 import {
   aiExtractionSchema,
   analyzeCorrectionSchema,
+  submitCorrectionSchema,
 } from "@/lib/validations/correction.schema";
 import type { AttendanceRecord, WorkSchedule } from "@/types/domain";
 
@@ -36,15 +42,22 @@ export type AnalyzeResult =
 export async function analyzeCorrection(
   message: string,
 ): Promise<AnalyzeResult> {
+  const user = await getCurrentUser();
+  if (!user?.employee) {
+    return { ok: false, error: "No employee record is linked to this account." };
+  }
+
   const parsed = analyzeCorrectionSchema.safeParse({ message });
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0].message };
   }
 
+  const today = todayInTimezone();
+
   // Validated at the boundary rather than trusted, because once the agent replaces the
   // placeholder this is model output and may be malformed.
   const extraction = aiExtractionSchema.safeParse(
-    extractCorrectionRequest(parsed.data.message, MOCK_TODAY),
+    extractCorrectionRequest(parsed.data.message, today),
   );
   if (!extraction.success) {
     return {
@@ -86,33 +99,111 @@ export async function analyzeCorrection(
     };
   }
 
-  const existing =
-    mockAttendance.find((r) => r.attendance_date === requested_date) ?? null;
-  const schedule =
-    mockSchedule.find((s) => s.day_of_week === weekdayIndex(requested_date)) ??
-    null;
-
-  const evaluation = evaluateCorrection({
-    requested_date,
-    requested_clock_in,
-    requested_clock_out,
-    existing,
-    schedule,
-    corrections_this_month: countAutomaticCorrectionsThisMonth(requested_date),
-    today: MOCK_TODAY,
-    rules: mockAttendanceRules,
+  const { existing, schedule, evaluation } = await evaluateForEmployee({
+    employeeId: user.employee.id,
+    requestedDate: requested_date,
+    requestedClockIn: requested_clock_in,
+    requestedClockOut: requested_clock_out,
+    today,
   });
 
   return { ok: true, analysis: { ...base, existing, schedule, evaluation } };
 }
 
-function countAutomaticCorrectionsThisMonth(date: string) {
-  const month = date.slice(0, 7);
+export type SubmitActionResult =
+  | {
+      ok: true;
+      decision: CorrectionEvaluation["decision"];
+      duplicate: boolean;
+      /** Whether attendance was actually changed, not merely what the decision allowed. */
+      applied: boolean;
+    }
+  | { ok: false; error: string };
 
-  return mockCorrectionRequests.filter(
-    (request) =>
-      request.ai_decision === "auto_approve" &&
-      request.status === "completed" &&
-      request.requested_date.slice(0, 7) === month,
-  ).length;
+export async function submitCorrection(input: {
+  requested_date: string;
+  requested_clock_in: string | null;
+  requested_clock_out: string | null;
+  employee_reason: string;
+}): Promise<SubmitActionResult> {
+  const user = await getCurrentUser();
+  if (!user?.employee) {
+    return { ok: false, error: "No employee record is linked to this account." };
+  }
+
+  const parsed = submitCorrectionSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0].message };
+  }
+
+  // Re-evaluated here rather than carried over from the analysis step. The browser could
+  // send any decision it liked, and a correction must never be approved on that basis.
+  const { existing, evaluation } = await evaluateForEmployee({
+    employeeId: user.employee.id,
+    requestedDate: parsed.data.requested_date,
+    requestedClockIn: parsed.data.requested_clock_in,
+    requestedClockOut: parsed.data.requested_clock_out,
+    today: todayInTimezone(),
+  });
+
+  const result = await submitCorrectionRequest({
+    employeeId: user.employee.id,
+    userId: user.userId,
+    requestedDate: parsed.data.requested_date,
+    requestedClockIn: parsed.data.requested_clock_in,
+    requestedClockOut: parsed.data.requested_clock_out,
+    employeeReason: parsed.data.employee_reason,
+    attendanceRecordId: existing?.id ?? null,
+    evaluation,
+  });
+
+  if (!result.ok) {
+    return { ok: false, error: result.error };
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/corrections");
+  revalidatePath("/attendance");
+  revalidatePath("/notifications");
+
+  return {
+    ok: true,
+    decision: evaluation.decision,
+    duplicate: result.duplicate,
+    applied: result.applied,
+  };
+}
+
+async function evaluateForEmployee(params: {
+  employeeId: string;
+  requestedDate: string;
+  requestedClockIn: string | null;
+  requestedClockOut: string | null;
+  today: string;
+}) {
+  const [existing, schedule, rules, correctionsThisMonth] = await Promise.all([
+    getAttendanceForDate(params.employeeId, params.requestedDate),
+    getScheduleForDate(
+      params.employeeId,
+      params.requestedDate,
+      weekdayIndex(params.requestedDate),
+    ),
+    getAttendanceRuleConfig(),
+    countAutoAppliedInMonth(params.employeeId, params.requestedDate.slice(0, 7)),
+  ]);
+
+  const evaluation = evaluateCorrection({
+    requested_date: params.requestedDate,
+    requested_clock_in: params.requestedClockIn,
+    requested_clock_out: params.requestedClockOut,
+    existing,
+    // Passed through as null when absent. The rule engine treats a missing schedule as
+    // "overtime cannot be assessed" rather than assuming a default shift.
+    schedule,
+    corrections_this_month: correctionsThisMonth,
+    today: params.today,
+    rules,
+  });
+
+  return { existing, schedule, evaluation };
 }

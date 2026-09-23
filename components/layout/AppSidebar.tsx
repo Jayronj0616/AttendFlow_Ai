@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Clock } from "lucide-react";
+import { Clock, LogOut } from "lucide-react";
+
+import { signOutAction } from "@/lib/actions/auth.actions";
 
 import {
   Sidebar,
@@ -87,8 +89,6 @@ export function AppSidebar({ role, name, subtitle }: AppSidebarProps) {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            {/* Rendered as a plain element, not a button. It becomes the account menu once
-                authentication exists; until then it should not look pressable. */}
             <SidebarMenuButton
               size="lg"
               asChild
@@ -106,6 +106,18 @@ export function AppSidebar({ role, name, subtitle }: AppSidebarProps) {
                 </div>
               </div>
             </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <form action={signOutAction}>
+              <SidebarMenuButton
+                type="submit"
+                tooltip="Sign out"
+                className="w-full"
+              >
+                <LogOut />
+                <span>Sign out</span>
+              </SidebarMenuButton>
+            </form>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

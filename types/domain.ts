@@ -1,136 +1,28 @@
-// Domain types mirroring the schema in docs/database.md.
-//
-// Field names are snake_case to match the database columns exactly, so these line up 1:1
-// with the Supabase-generated types in database.types.ts once the schema is applied and
-// no mapping layer is needed between the two.
+// Domain aliases derived from the database schema, so a column change surfaces as a type
+// error rather than a silent mismatch. Import these rather than reaching into Database
+// directly — it keeps call sites readable and survives regenerating database.types.ts.
 
-export type Role = "employee" | "hr" | "admin";
+import type { Database } from "./database.types";
 
-export type AttendanceStatus =
-  | "present"
-  | "absent"
-  | "late"
-  | "undertime"
-  | "incomplete"
-  | "on_leave"
-  | "rest_day";
+type Tables = Database["public"]["Tables"];
+type Enums = Database["public"]["Enums"];
 
-export type CorrectionRequestStatus =
-  | "submitted"
-  | "ai_reviewing"
-  | "pending_hr"
-  | "approved"
-  | "rejected"
-  | "completed"
-  | "cancelled";
+export type Role = Enums["user_role"];
+export type AttendanceStatus = Enums["attendance_status"];
+export type CorrectionRequestStatus = Enums["correction_status"];
+export type AiDecision = Enums["ai_decision"];
+export type ApprovalStatus = Enums["approval_status"];
+export type ActorType = Enums["actor_type"];
 
-export type AiDecision =
-  | "auto_approve"
-  | "requires_hr_approval"
-  | "reject"
-  | "needs_clarification";
+export type Department = Tables["departments"]["Row"];
+export type Employee = Tables["employees"]["Row"];
+export type Profile = Tables["profiles"]["Row"];
+export type AttendanceRecord = Tables["attendance_records"]["Row"];
+export type WorkSchedule = Tables["work_schedules"]["Row"];
+export type AttendanceRule = Tables["attendance_rules"]["Row"];
+export type CorrectionRequest = Tables["correction_requests"]["Row"];
+export type ApprovalRequest = Tables["approval_requests"]["Row"];
+export type AuditLog = Tables["audit_logs"]["Row"];
+export type Notification = Tables["notifications"]["Row"];
 
-export type ApprovalStatus = "pending" | "approved" | "rejected";
-
-export type ActorType = "employee" | "hr" | "admin" | "ai_agent" | "system";
-
-export type Department = {
-  id: string;
-  name: string;
-  description: string | null;
-};
-
-export type Employee = {
-  id: string;
-  employee_number: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  department_id: string | null;
-  position: string | null;
-  employment_status: string;
-};
-
-export type Profile = {
-  id: string;
-  employee_id: string | null;
-  role: Role;
-  first_name: string | null;
-  last_name: string | null;
-  email: string | null;
-  is_active: boolean;
-};
-
-export type AttendanceRecord = {
-  id: string;
-  employee_id: string;
-  /** Calendar date, YYYY-MM-DD. */
-  attendance_date: string;
-  /** ISO 8601 timestamp, or null when the punch is missing. */
-  clock_in: string | null;
-  clock_out: string | null;
-  status: AttendanceStatus;
-  source: string | null;
-  notes: string | null;
-};
-
-export type WorkSchedule = {
-  id: string;
-  employee_id: string;
-  /** 0 = Sunday through 6 = Saturday. */
-  day_of_week: number;
-  /** Wall-clock time, HH:MM:SS, interpreted in `timezone`. */
-  scheduled_start: string;
-  scheduled_end: string;
-  timezone: string;
-  effective_from: string;
-  effective_until: string | null;
-};
-
-export type CorrectionRequest = {
-  id: string;
-  employee_id: string;
-  attendance_record_id: string | null;
-  requested_date: string;
-  requested_clock_in: string | null;
-  requested_clock_out: string | null;
-  employee_reason: string;
-  status: CorrectionRequestStatus;
-  ai_decision: AiDecision | null;
-  ai_confidence: number | null;
-  ai_reason: string | null;
-  submitted_at: string;
-  reviewed_at: string | null;
-  reviewed_by: string | null;
-  completed_at: string | null;
-};
-
-export type ApprovalRequest = {
-  id: string;
-  correction_request_id: string;
-  approver_id: string;
-  status: ApprovalStatus;
-  comment: string | null;
-  created_at: string;
-  resolved_at: string | null;
-};
-
-export type AuditLog = {
-  id: string;
-  actor_type: ActorType;
-  actor_id: string | null;
-  action: string;
-  entity_type: string;
-  entity_id: string | null;
-  created_at: string;
-};
-
-export type Notification = {
-  id: string;
-  user_id: string;
-  type: string;
-  title: string;
-  message: string;
-  is_read: boolean;
-  created_at: string;
-};
+export type NewCorrectionRequest = Tables["correction_requests"]["Insert"];

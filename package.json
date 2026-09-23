@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:types": "supabase gen types typescript --linked > types/database.types.ts"
+    "db:types": "node scripts/gen-types.mjs",
+    "db:push": "node scripts/db-push.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

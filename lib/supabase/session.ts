@@ -4,6 +4,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { publicEnv } from "@/lib/env";
 import type { Database } from "@/types/database.types";
 
+/** Paths reachable without a session. Everything else requires one. */
+const PUBLIC_PATHS = ["/login", "/auth"];
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -30,7 +33,27 @@ export async function updateSession(request: NextRequest) {
 
   // Refreshes an expired token and rewrites the session cookies. Must not be removed:
   // Server Components cannot write cookies, so this is the only place the refresh lands.
-  await supabase.auth.getUser();
+  // It must also run before the check below, or a valid-but-stale session reads as absent.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { pathname } = request.nextUrl;
+  const isPublic = PUBLIC_PATHS.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`),
+  );
+
+  if (!user && !isPublic) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
+
+  if (user && pathname === "/login") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard";
+    return NextResponse.redirect(url);
+  }
 
   return supabaseResponse;
 }

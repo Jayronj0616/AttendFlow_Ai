@@ -17,6 +17,11 @@ const rules: AttendanceRuleConfig = {
   locked_payroll_periods: [{ start: "2026-09-01", end: "2026-09-15" }],
 };
 
+const TIMESTAMPS = {
+  created_at: "2026-01-01T00:00:00+08:00",
+  updated_at: "2026-01-01T00:00:00+08:00",
+};
+
 const schedule: WorkSchedule = {
   id: "sched-2",
   employee_id: "emp-1",
@@ -26,6 +31,7 @@ const schedule: WorkSchedule = {
   timezone: "Asia/Manila",
   effective_from: "2026-01-01",
   effective_until: null,
+  ...TIMESTAMPS,
 };
 
 const at = (date: string, time: string) => `${date}T${time}+08:00`;
@@ -40,6 +46,7 @@ function record(overrides: Partial<AttendanceRecord> = {}): AttendanceRecord {
     status: "incomplete",
     source: "biometric",
     notes: null,
+    ...TIMESTAMPS,
     ...overrides,
   };
 }
@@ -188,6 +195,25 @@ describe("evaluateCorrection", () => {
       );
 
       expect(codes(result)).not.toContain("existing_attendance_protected");
+    });
+
+    /*
+     * Timestamps must be compared as instants, never as strings. Postgres returns
+     * `2026-09-22T09:10:00+00:00` for a value the application sent as
+     * `2026-09-22T17:10:00+08:00`; they are the same moment spelled two ways. A string
+     * comparison reports a conflict that does not exist, which would escalate a correction
+     * that changes nothing and block it from being applied automatically.
+     */
+    it("does not flag a conflict when the same instant is spelled differently", () => {
+      const result = evaluateCorrection(
+        input({
+          existing: record({ clock_out: "2026-09-22T09:10:00+00:00" }),
+          requested_clock_out: "2026-09-22T17:10:00+08:00",
+        }),
+      );
+
+      expect(codes(result)).not.toContain("existing_attendance_protected");
+      expect(result.decision).toBe("auto_approve");
     });
 
     it("flags a conflicting clock-in independently of clock-out", () => {
