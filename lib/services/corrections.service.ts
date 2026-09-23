@@ -4,7 +4,7 @@ import { isSameInstant } from "@/lib/datetime";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { CorrectionEvaluation } from "@/lib/services/correction-rules.service";
-import type { CorrectionRequest } from "@/types/domain";
+import type { AttendanceRecord, CorrectionRequest } from "@/types/domain";
 
 export async function getCorrectionRequests(
   employeeId: string,
@@ -223,50 +223,66 @@ export async function submitCorrectionRequest(
  * that were asked for. docs/system_flow.md section 14 requires the result to be verified
  * rather than assumed, and success is never reported on the strength of a write returning
  * without an error.
+ *
+ * Shared by the automatic path and by HR approval, deliberately: the verification is the
+ * part that must not drift between them.
  */
-async function applyCorrection(
-  params: SubmitParams,
-  requestId: string,
-): Promise<boolean> {
+export async function applyPunchesToAttendance(params: {
+  employeeId: string;
+  date: string;
+  clockIn: string | null;
+  clockOut: string | null;
+}): Promise<AttendanceRecord | null> {
   const admin = createAdminClient();
 
   const patch: Record<string, string> = {};
-  if (params.requestedClockIn) patch.clock_in = params.requestedClockIn;
-  if (params.requestedClockOut) patch.clock_out = params.requestedClockOut;
+  if (params.clockIn) patch.clock_in = params.clockIn;
+  if (params.clockOut) patch.clock_out = params.clockOut;
 
   const { data: updated, error } = await admin
     .from("attendance_records")
     .update({ ...patch, status: "present", source: "correction" })
     .eq("employee_id", params.employeeId)
-    .eq("attendance_date", params.requestedDate)
+    .eq("attendance_date", params.date)
     .select()
     .maybeSingle();
 
   if (error || !updated) {
-    console.error("applyCorrection: attendance update failed", error);
-    return false;
+    console.error("applyPunchesToAttendance: update failed", error);
+    return null;
   }
 
   // Compared as instants. Postgres returns its own timestamp spelling, which will not
   // match the string that was sent even when the value is identical.
   const matches =
-    (!params.requestedClockIn ||
-      isSameInstant(updated.clock_in, params.requestedClockIn)) &&
-    (!params.requestedClockOut ||
-      isSameInstant(updated.clock_out, params.requestedClockOut));
+    (!params.clockIn || isSameInstant(updated.clock_in, params.clockIn)) &&
+    (!params.clockOut || isSameInstant(updated.clock_out, params.clockOut));
 
   if (!matches) {
-    console.error("applyCorrection: written values did not match the request", {
-      requested: {
-        clock_in: params.requestedClockIn,
-        clock_out: params.requestedClockOut,
-      },
+    console.error("applyPunchesToAttendance: stored values did not match", {
+      requested: { clock_in: params.clockIn, clock_out: params.clockOut },
       stored: { clock_in: updated.clock_in, clock_out: updated.clock_out },
     });
-    return false;
+    return null;
   }
 
-  await admin
+  return updated;
+}
+
+async function applyCorrection(
+  params: SubmitParams,
+  requestId: string,
+): Promise<boolean> {
+  const updated = await applyPunchesToAttendance({
+    employeeId: params.employeeId,
+    date: params.requestedDate,
+    clockIn: params.requestedClockIn,
+    clockOut: params.requestedClockOut,
+  });
+
+  if (!updated) return false;
+
+  await createAdminClient()
     .from("correction_requests")
     .update({
       status: "completed",
