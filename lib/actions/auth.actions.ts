@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 
+import { publicEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { signInSchema } from "@/lib/validations/auth.schema";
 
@@ -24,6 +25,20 @@ export async function signInAction(
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
 
   if (error) {
+    // Logged server-side, because the message shown to the user cannot distinguish a
+    // wrong password from a misconfigured key — and that ambiguity, while correct for
+    // security, makes a deployment problem look identical to a typo.
+    // The URL and key length are safe to log: both are public values.
+    console.error("signInAction: sign-in rejected", {
+      status: error.status,
+      code: error.code,
+      message: error.message,
+      supabaseHost: new URL(publicEnv.NEXT_PUBLIC_SUPABASE_URL).host,
+      anonKeyLength: publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY.length,
+      anonKeyLooksLikeJwt:
+        publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY.startsWith("eyJ"),
+    });
+
     // Deliberately not distinguishing an unknown address from a wrong password, which
     // would let anyone probe which email addresses have accounts.
     return { error: "Those credentials did not match an account." };
