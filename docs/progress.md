@@ -23,8 +23,33 @@ contract is already validated at the boundary, so replacing the body changes not
 downstream. Everything the agent would be trusted with — deciding whether a correction is
 allowed — is deliberately not its job and already works without it.
 
-**Deployment (Phase 10)** needs a Vercel project, and a decision about whether production
-uses this Supabase project or a separate one.
+**Deployment (Phase 10)** is live at https://attendflow-ai.vercel.app, on this same
+Supabase project. Sign-in, a correction submitted end to end, and the HR queue receiving it
+were all verified directly against production, not assumed from a successful build.
+
+## Deployment Notes
+
+Two real bugs surfaced only once the app was live, which is exactly the case for actually
+checking a deployment rather than trusting a green build.
+
+**`robots.txt` and `sitemap.xml` were being redirected to the sign-in page.** Neither path
+was excluded from the proxy's route matcher, so the session guard caught them like any other
+protected route. A crawler requesting `robots.txt` received a `noindex` HTML page instead of
+the file — silently defeating the entire point of making the landing page indexable. Fixed
+by excluding both paths in `proxy.ts`.
+
+**Sign-in failed in production only, with `401 Invalid API key` from Supabase's own auth
+server** — not a wrong password. The anon key was confirmed correct and working from every
+local angle: raw HTTP, and the real Supabase SDK. The actual cause was specific to Vercel:
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` had been stored as environment variable type `Secret`
+instead of `Config`. Vercel's dashboard displayed the value correctly — right length, valid
+JWT, matching the local key exactly when decoded — with no visible indication anything was
+wrong, but a `NEXT_PUBLIC_` value needs to be stored as `Config` to be reliably inlined at
+build time. Fixed by removing and recreating both `NEXT_PUBLIC_SUPABASE_URL` and
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` with `--type config`, piping the value directly from the
+local env file to also rule out copy-paste corruption, followed by a fresh production
+build. Documented as a memory since this is a Vercel-platform behavior that would recur on
+any future project.
 
 ---
 
@@ -38,7 +63,7 @@ uses this Supabase project or a separate one.
 - [x] Configure environment variables
 - [x] Establish project structure
 - [x] Verify local development
-- [ ] Verify Vercel compatibility
+- [x] Verify Vercel compatibility
 
 ## Phase 1 Notes
 
