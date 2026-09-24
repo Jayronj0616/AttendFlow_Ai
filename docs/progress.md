@@ -2,16 +2,29 @@
 
 ## Current Phase
 
-Phase 6 — Workflow Automation
+Phase 5 — AI Agent
 
 ## Project Status
 
-In Progress. The employee workflow runs end to end against the hosted Supabase project: an
-employee signs in, describes a correction, and the system evaluates it, writes it, verifies
-the write, and records the audit trail. Mock fixtures have been deleted.
+In Progress. Everything except the language model itself is built and runs against the
+hosted Supabase project.
 
-What remains is the HR side. An escalated correction creates an approval request, but no
-interface exists yet for HR to act on it.
+An employee signs in, describes a correction in their own words, and the system evaluates
+it against deterministic rules, applies it or escalates it, verifies the write, and records
+the audit trail. HR reviews escalated corrections and can approve, reject, or ask for more
+detail. Administrators manage the employee directory and the attendance rules. A public
+landing page fronts the whole thing.
+
+Two things remain, and both need a decision rather than more code.
+
+**The agent (Phase 5)** needs an AI provider key. `lib/ai/extract-request.ts` is an
+explicitly marked placeholder that reads dates and times with regular expressions. Its
+contract is already validated at the boundary, so replacing the body changes nothing
+downstream. Everything the agent would be trusted with — deciding whether a correction is
+allowed — is deliberately not its job and already works without it.
+
+**Deployment (Phase 10)** needs a Vercel project, and a decision about whether production
+uses this Supabase project or a separate one.
 
 ---
 
