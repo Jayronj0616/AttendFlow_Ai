@@ -63,6 +63,33 @@ supabase/migrations/  SQL schema and RLS policies
 proxy.ts              Session refresh on every matched request
 ```
 
+## Deploying to Vercel
+
+Import the repository in Vercel and set these three environment variables. Nothing else in
+`.env.local` belongs in production — `SUPABASE_DB_URL`, `SUPABASE_ACCESS_TOKEN`, and
+`SEED_DEMO_PASSWORD` are local tooling and should not be added.
+
+| Variable | Notes |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Safe in the browser |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Safe in the browser; RLS governs what it can read |
+| `SUPABASE_SERVICE_ROLE_KEY` | **Server only.** Never prefix with `NEXT_PUBLIC_` |
+
+`NEXT_PUBLIC_SITE_URL` is optional. Without it, canonical URLs, Open Graph tags, and the
+sitemap fall back to Vercel's production domain automatically; set it only when a custom
+domain is in use.
+
+Migrations are not run by the build. Apply them from a machine that has `SUPABASE_DB_URL`:
+
+```bash
+pnpm db:push
+```
+
+Two things worth deciding before going live. Whether production shares this Supabase
+project or gets its own — sharing is fine for a demo, but then development and production
+write to the same attendance records. And whether to keep the seeded demo accounts, since
+`scripts/seed.mjs` deletes and recreates them on every run.
+
 ## Database access
 
 Three Supabase clients, and picking the wrong one is a security bug:
