@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Poppins, Geist_Mono } from "next/font/google";
 
+import { AnalyticsScript } from "@/components/layout/AnalyticsScript";
 import { ThemeProvider } from "@/components/layout/ThemeProvider";
 import { SITE_NAME, SITE_URL } from "@/lib/site";
 import "./globals.css";
@@ -48,6 +49,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         >
           {children}
         </ThemeProvider>
+        <AnalyticsScript />
       </body>
     </html>
   );
