@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
 import {
   ClipboardCheck,
   FileSearch,
@@ -11,7 +10,7 @@ import {
   Workflow,
 } from "lucide-react";
 
-import { SignInDialog } from "@/components/marketing/SignInDialog";
+import { PrimaryCta } from "@/components/marketing/PrimaryCta";
 import { SiteFooter } from "@/components/marketing/SiteFooter";
 import { SiteHeader } from "@/components/marketing/SiteHeader";
 import { Button } from "@/components/ui/button";
@@ -32,14 +31,10 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title: "AttendFlow AI", description: DESCRIPTION },
 };
 
-export default async function LandingPage() {
-  // Only a cookie check, not a verified session. Calling getUser() here would add a round
-  // trip to the auth server for every anonymous visitor purely to choose a button label,
-  // and nothing on this page is protected by the answer — the proxy guards the app itself.
-  const store = await cookies();
-  const isSignedIn = store
-    .getAll()
-    .some((c) => c.name.startsWith("sb-") && c.name.includes("auth-token"));
+// Prerendered at build time and served from the CDN. Nothing here may read the request:
+// the signed-in call to action is decided on the client by PrimaryCta, and the proxy skips
+// "/" entirely (see proxy.ts).
+export default function LandingPage() {
 
   return (
     <>
@@ -56,7 +51,7 @@ export default async function LandingPage() {
         }}
       />
 
-      <SiteHeader isSignedIn={isSignedIn} />
+      <SiteHeader />
 
       <main className="flex-1">
         <section className="mx-auto w-full max-w-6xl px-4 py-20 md:px-6 md:py-28">
@@ -73,15 +68,7 @@ export default async function LandingPage() {
               your rules, and either fixes it or sends it to someone who can.
             </p>
             <div className="flex flex-wrap gap-3">
-              {isSignedIn ? (
-                <Button asChild size="lg">
-                  <a href="/dashboard">Go to dashboard</a>
-                </Button>
-              ) : (
-                <SignInDialog
-                  trigger={<Button size="lg">Sign in</Button>}
-                />
-              )}
+              <PrimaryCta size="lg" />
               <Button asChild size="lg" variant="outline">
                 <a href="#how-it-works">See how it works</a>
               </Button>
@@ -175,13 +162,7 @@ export default async function LandingPage() {
                   Sign in to review your attendance or file a correction.
                 </p>
               </div>
-              {isSignedIn ? (
-                <Button asChild size="lg">
-                  <a href="/dashboard">Go to dashboard</a>
-                </Button>
-              ) : (
-                <SignInDialog trigger={<Button size="lg">Sign in</Button>} />
-              )}
+              <PrimaryCta size="lg" />
             </div>
           </div>
         </section>
