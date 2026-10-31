@@ -51,6 +51,14 @@ local env file to also rule out copy-paste corruption, followed by a fresh produ
 build. Documented as a memory since this is a Vercel-platform behavior that would recur on
 any future project.
 
+**The landing page was server-rendered on every request.** It read `cookies()` only to
+choose between "Sign in" and "Go to dashboard", and reading the request makes a route
+dynamic. In production, `/` always returned `x-vercel-cache: MISS`, with a time to first
+byte of about 2.2 s cold and 0.8 s warm. The cookie check now runs in the browser
+(`hooks/use-has-session-cookie.ts`), so `/` is prerendered, and the proxy matcher skips
+exactly `/`, so the CDN can serve it without invoking a function. The check was never a
+security boundary. Protected routes are still guarded by the proxy, unchanged.
+
 ---
 
 # Phase 1 — Project Foundation
