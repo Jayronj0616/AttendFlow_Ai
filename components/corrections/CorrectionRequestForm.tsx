@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
+import { useOpenPanel } from "@openpanel/nextjs";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2 } from "lucide-react";
 
@@ -26,6 +27,7 @@ type Outcome = {
 
 export function CorrectionRequestForm() {
   const router = useRouter();
+  const { track } = useOpenPanel();
   const [message, setMessage] = useState("");
   const [analysis, setAnalysis] = useState<CorrectionAnalysis | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +73,12 @@ export function CorrectionRequestForm() {
       });
 
       if (result.ok) {
+        // Only the decision path is recorded, never the request text, date or times.
+        if (!result.duplicate) {
+          track("correction_submitted", {
+            path: result.applied ? "auto_applied" : "escalated_to_hr",
+          });
+        }
         setOutcome({ duplicate: result.duplicate, applied: result.applied });
         setSubmitError(null);
         router.refresh();

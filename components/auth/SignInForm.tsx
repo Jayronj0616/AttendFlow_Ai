@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
+import { useOpenPanel } from "@openpanel/nextjs";
+import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -12,6 +14,14 @@ const INITIAL: SignInState = { error: null };
 
 export function SignInForm() {
   const [state, formAction, isPending] = useActionState(signInAction, INITIAL);
+  const router = useRouter();
+  const { track } = useOpenPanel();
+
+  useEffect(() => {
+    if (!state.signedIn) return;
+    track("logged_in");
+    router.replace("/dashboard");
+  }, [state.signedIn, track, router]);
 
   return (
     <form action={formAction} className="space-y-4">

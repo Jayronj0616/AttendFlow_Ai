@@ -6,7 +6,7 @@ import { publicEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { signInSchema } from "@/lib/validations/auth.schema";
 
-export type SignInState = { error: string | null };
+export type SignInState = { error: string | null; signedIn?: boolean };
 
 export async function signInAction(
   _previous: SignInState,
@@ -44,7 +44,9 @@ export async function signInAction(
     return { error: "Those credentials did not match an account." };
   }
 
-  redirect("/dashboard");
+  // The client navigates after recording the sign-in, which a server-side redirect here
+  // would make impossible: the form never sees a successful result.
+  return { error: null, signedIn: true };
 }
 
 export async function signOutAction() {
