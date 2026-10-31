@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Clock, Menu } from "lucide-react";
 
-import { SignInDialog } from "@/components/marketing/SignInDialog";
+import { PrimaryCta } from "@/components/marketing/PrimaryCta";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +20,7 @@ const NAV = [
   { label: "Safeguards", href: "#safeguards" },
 ];
 
-export function SiteHeader({ isSignedIn }: { isSignedIn: boolean }) {
+export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center gap-4 px-4 md:px-6">
@@ -45,13 +45,7 @@ export function SiteHeader({ isSignedIn }: { isSignedIn: boolean }) {
         <div className="ml-auto flex items-center gap-2 md:ml-0">
           <ThemeToggle />
 
-          {isSignedIn ? (
-            <Button asChild size="sm">
-              <Link href="/dashboard">Go to dashboard</Link>
-            </Button>
-          ) : (
-            <SignInDialog trigger={<Button size="sm">Sign in</Button>} />
-          )}
+          <PrimaryCta size="sm" />
 
           <Sheet>
             <SheetTrigger asChild>
