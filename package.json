@@ -16,6 +16,7 @@
     "db:verify-rls": "node scripts/verify-rls.mjs"
   },
   "dependencies": {
+    "@openpanel/nextjs": "^1.5.3",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.1",
     "class-variance-authority": "^0.7.1",
